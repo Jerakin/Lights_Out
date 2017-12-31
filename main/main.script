@@ -1,0 +1,11 @@
+local TOGGLE_PROFILER = hash("TOGGLE_PROFILER")
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+end
+
+function on_input(self, action_id, action)
+	if action_id == TOGGLE_PROFILER and action.released then
+		msg.post("@system:", "toggle_profile")
+	end
+end

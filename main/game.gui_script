@@ -1,0 +1,211 @@
+
+-- Forward declare
+local from_seconds
+local format_time
+local reverse_boxes
+local switch_neighbours
+local random_indexes
+local play_victory
+local reset
+local randomize_board
+local new_game
+
+local off_color = vmath.vector4(0.12, 0.17, 0.3, 1)
+local on_color = vmath.vector4(1)
+local TOUCH = hash("touch")
+
+from_seconds = function(inputSeconds)
+	local secondsInAMinute = 60
+	local secondsInAnHour  = 60 * secondsInAMinute
+	local secondsInADay    = 24 * secondsInAnHour
+
+	-- extract days
+	local days = math.floor(inputSeconds / secondsInADay)
+
+	-- extract hours
+	local hourSeconds = inputSeconds % secondsInADay;
+	local hours = math.floor(hourSeconds / secondsInAnHour);
+
+	-- extract minutes
+	local minuteSeconds = hourSeconds % secondsInAnHour;
+	local minutes = math.floor(minuteSeconds / secondsInAMinute);
+
+	-- extract the remaining seconds
+	local remainingSeconds = minuteSeconds % secondsInAMinute;
+	local seconds = math.ceil(remainingSeconds);
+
+	return {days=days, hours=hours, minutes=minutes, seconds=seconds}
+end
+
+
+format_time = function( inputSeconds)
+	local text = ""
+	local time = from_seconds(inputSeconds)
+
+	if time.days > 0 then
+		text = string.format("%s days %s hours \n%s min %s s", time.days, time.hours, time.minutes, time.seconds)
+	elseif time.hours > 0 then
+		text = string.format("%s hours \n%s min %s s", time.hours, time.minutes, time.seconds)
+	elseif time.minutes > 0 then
+		text = string.format("%s min %s s", time.minutes, time.seconds)
+	else
+		text = string.format("%s s", time.seconds)
+	end
+	return text
+end
+
+
+reverse_boxes = function(self, indexes)
+	for i, index in pairs(indexes) do
+		self.board[index].state = not self.board[index].state
+		local color
+		if self.board[index].state then
+			color = on_color
+		else
+			color = off_color
+		end
+		gui.animate(self.board[index].node, "color", color, gui.EASING_LINEAR, 0.1)
+	end
+end
+
+
+switch_neighbours = function(self, index)
+	local switch_indexes = {}
+	table.insert(switch_indexes, index)
+	
+	if index % 5 > 0 then 
+		table.insert(switch_indexes, index+1)
+	end
+	if index % 5 ~= 1 then
+		table.insert(switch_indexes, index-1)
+	end
+	if index - 5 >= 1 then
+		table.insert(switch_indexes, index-5)
+	end
+	if index + 5 <= #self.board then
+		table.insert(switch_indexes, index+5)
+	end
+	reverse_boxes(self, switch_indexes)
+end
+
+
+random_indexes = function(self, amount_of_lit_boxes)
+	local list_of_index = {} 
+	amount_of_lit_boxes = amount_of_lit_boxes or 5
+	
+	while #list_of_index < amount_of_lit_boxes do
+		local number = math.random(1, 25)
+		local _add = true
+		for i, num in pairs(list_of_index) do
+			if num == number then
+				_add = false
+				break
+			end
+		end
+		if _add then
+			table.insert(list_of_index, number)
+		end
+	end
+	return list_of_index
+end
+
+
+play_victory = function(self)
+	gui.set_enabled(self.victory_text, true)
+	gui.set_position(self.victory_text, vmath.vector3(-200, 750, 0))
+	gui.animate(self.victory_text, "position.x", 360, gui.EASING_INCUBIC, 0.6)
+end
+
+
+reset = function(self)
+	if gui.get_position(self.victory_text).x == 360 then
+		gui.animate(self.victory_text, "position.x", 920, gui.EASING_OUTSINE, 0.6, 0, function() 
+			gui.set_enabled(self.victory_text, false)
+			new_game(self)
+		end)
+	end
+end
+
+
+check_for_victory = function(self)
+	for i, entry in pairs(self.board) do
+		if entry.state then
+			return
+		end
+	end
+	self.board_locked = true
+	play_victory(self)
+end
+
+
+randomize_board = function(self, amount_of_lit_boxes)
+	reverse_boxes(self, random_indexes(self, amount_of_lit_boxes))
+end
+
+
+new_game = function(self)
+	gui.set_enabled(self.victory_text, false)
+	self.board = {}
+	self.time = 0
+	self.moves = 0
+	self.board_locked = false
+
+	for i = 1, 25 do
+		local n = gui.get_node("box" .. i)
+		table.insert(self.board, {node=n, state=false})
+		gui.set_color(n, off_color)
+	end
+	randomize_board(self, math.random(5, 15))
+end
+
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	self.victory_text = gui.get_node("victory_text")
+	self.timer_node = gui.get_node("time")
+	self.moves_node = gui.get_node("moves")
+	
+	gui.animate(gui.get_node("instructions"), "color", vmath.vector4(0), gui.EASING_OUTSINE, 3, 1.5)
+	math.randomseed(os.clock())
+	
+	-- popping some numbers to get better randomness
+	math.random(); math.random(); math.random()
+	new_game(self)
+end
+
+
+function update(self, dt)
+	if not self.board_locked then
+		self.time = self.time + dt
+		gui.set_text(self.timer_node, "Time: " .. format_time(self.time))
+	end
+end
+
+
+function on_input(self, action_id, action)
+	if action_id == TOUCH and action.pressed then
+		if not self.board_locked then
+			for i, entry in pairs(self.board) do
+				if gui.pick_node(entry.node, action.x, action.y) then
+					switch_neighbours(self, i)
+					self.moves = self.moves + 1
+					gui.set_text(self.moves_node, "Moves: " .. self.moves)
+					return
+				end
+			end
+			if gui.pick_node(gui.get_node("box"), action.x, action.y) then
+				new_game(self)
+			end
+		else
+			reset(self)
+		end
+	end
+end
+
+
+function on_reload(self)
+	for i, n in pairs(self.board) do
+		n.state = false
+	end
+	check_for_victory(self)
+end

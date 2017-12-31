@@ -1,0 +1,24 @@
+key_trigger {
+  input: KEY_9
+  action: "defbug_info"
+}
+key_trigger {
+  input: KEY_8
+  action: "defbug_details"
+}
+key_trigger {
+  input: KEY_0
+  action: "toggle_profile"
+}
+key_trigger {
+  input: KEY_SPACE
+  action: ""
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_1
+  action: "touch"
+}
+text_trigger {
+  input: TEXT
+  action: ""
+}

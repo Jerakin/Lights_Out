@@ -1,0 +1,9 @@
+images {
+  image: "/assets/textures/gradient.png"
+}
+images {
+  image: "/assets/textures/defoldlogo.png"
+}
+margin: 0
+extrude_borders: 0
+inner_padding: 0
